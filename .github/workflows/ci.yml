@@ -1,0 +1,134 @@
+name: Crew Runner CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crew-runner/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'crew-runner/**'
+      - '.github/workflows/ci.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: alteriom/crew-runner
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat crew-runner/VERSION)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Building crew-runner v$VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crew-runner
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+
+      - name: Run tests
+        run: |
+          docker run -d \
+            --name crew-runner-test \
+            -p 8081:8081 \
+            -e OLLAMA_BASE_URL=http://localhost:11434 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+
+          echo "⏳ Waiting for crew-runner to be healthy..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8081/health > /dev/null; then
+              echo "✅ Health check passed"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Health check failed after 30 attempts"
+              docker logs crew-runner-test
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "🔍 Testing version endpoint..."
+          VERSION_RESPONSE=$(curl -s http://localhost:8081/version)
+          echo "Response: $VERSION_RESPONSE"
+          
+          echo "🔍 Testing health endpoint structure..."
+          HEALTH_RESPONSE=$(curl -s http://localhost:8081/health)
+          echo "Response: $HEALTH_RESPONSE"
+
+          docker stop crew-runner-test
+          docker rm crew-runner-test
+
+      - name: Check for zombie processes (security)
+        run: |
+          echo "🔍 Checking for zombie process vulnerabilities..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test \
+            sh -c 'ps aux | grep -E "defunct|<defunct>" || echo "✅ No zombies"'
+
+      - name: Push to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crew-runner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate deployment summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## 🚀 Crew Runner v${{ steps.version.outputs.version }} Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Images pushed:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Deploy to Friday VPS: \`docker pull ghcr.io/alteriom/crew-runner:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update docker-compose.prod.yml with new version" >> $GITHUB_STEP_SUMMARY
+          echo "3. Restart containers: \`docker compose up -d crew-runner\`" >> $GITHUB_STEP_SUMMARY
