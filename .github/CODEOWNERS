@@ -1,0 +1,14 @@
+# Crew-Runner Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @Alteriom/backend-team
+
+# Security-sensitive files require additional review
+SECURITY.md @Alteriom/security-team
+Dockerfile @Alteriom/devops-team
+.github/workflows/* @Alteriom/devops-team
+
+# Python core requires backend team review
+src/*.py @Alteriom/backend-team
+requirements.txt @Alteriom/backend-team
