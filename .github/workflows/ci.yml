@@ -4,12 +4,18 @@ on:
   push:
     branches: [main]
     paths:
-      - 'crew-runner/**'
-      - '.github/workflows/ci.yml'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+      - 'VERSION'
   pull_request:
     paths:
-      - 'crew-runner/**'
-      - '.github/workflows/ci.yml'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+      - 'VERSION'
 
 env:
   REGISTRY: ghcr.io
@@ -29,7 +35,7 @@ jobs:
       - name: Read version
         id: version
         run: |
-          VERSION=$(cat crew-runner/VERSION)
+          VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Building crew-runner v$VERSION"
 
@@ -58,7 +64,7 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./crew-runner
+          context: .
           push: false
           load: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
@@ -111,7 +117,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
-          context: ./crew-runner
+          context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
