@@ -62,7 +62,7 @@ jobs:
             type=sha,prefix={{branch}}-
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -115,7 +115,7 @@ jobs:
 
       - name: Push to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
