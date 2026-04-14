@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 import litellm
 
-import worker_client
+from src import worker_client
 
 # ---------------------------------------------------------------------------
 # Monkey-patch: normalize crewai TaskOutput.raw to always be a str.
@@ -312,7 +312,7 @@ def _instantiate_tools_from_metadata(tool_metadata: list[dict]) -> list[Any]:
     We recreate real tool instances here inside the runner so they execute
     in the same process as the CrewAI agents.
     """
-    from tools_wrappers import create_crewai_tool  # type: ignore
+    from src.tools_wrappers import create_crewai_tool  # type: ignore
     tools = []
     for meta in tool_metadata or []:
         try:
