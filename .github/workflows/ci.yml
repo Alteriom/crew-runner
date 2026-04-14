@@ -26,6 +26,12 @@ env:
   IMAGE_NAME: alteriom/crew-runner
 
 jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
