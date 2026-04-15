@@ -28,10 +28,17 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY . .
+COPY src ./src
+
+# Copy CrewAI skills (copied into build context by build.sh)
+# These provide domain expertise to crew agents
+COPY --chown=appuser:appuser skills /app/skills
 
 RUN chown -R appuser:appuser /app
 USER appuser
+
+# Environment variable for skills path (optional, for documentation)
+ENV CREWAI_SKILLS_PATH=/app/skills
 
 EXPOSE 8081
 
